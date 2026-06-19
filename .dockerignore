@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+*.md
+!prompts/*.md
+.claude
+scratchpad
+# O MCP é um serviço separado no compose (build próprio); não vai na imagem da Luna.
+wattio-mcp

@@ -1,0 +1,94 @@
+services:
+  luna:
+    build:
+      context: .
+    image: wattio-luna:latest
+    container_name: wattio-luna
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: 8080
+      NODE_ENV: production
+      # --- Autenticação da API (chaves separadas por vírgula) ---
+      LUNA_API_KEYS: ${LUNA_API_KEYS}
+      # --- Claude Code (assinatura via OAuth OU API key) ---
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      # --- Repositório clonado localmente (lido pelo Claude Code) ---
+      GIT_REPO_URL: ${GIT_REPO_URL}
+      GIT_BRANCH: ${GIT_BRANCH:-}
+      GIT_USERNAME: ${GIT_USERNAME:-x-access-token}
+      GIT_TOKEN: ${GIT_TOKEN:-}
+      REPO_DIR: /app/repo
+      REPO_PULL_ON_REQUEST: ${REPO_PULL_ON_REQUEST:-true}
+      REPO_PULL_MIN_INTERVAL_MS: ${REPO_PULL_MIN_INTERVAL_MS:-30000}
+      # --- MCP: wattio-mcp (OpenSearch de tarefas operacionais) ---
+      # Aponta para o serviço wattio-mcp na rede do compose. Vazio = MCP desligado.
+      MCP_WATTIO_URL: ${MCP_WATTIO_URL:-http://wattio-mcp:8000/mcp}
+      # --- Limites ---
+      CLAUDE_TIMEOUT_MS: ${CLAUDE_TIMEOUT_MS:-180000}
+      CLAUDE_MAX_TURNS: ${CLAUDE_MAX_TURNS:-30}
+      MAX_TICKET_LENGTH: ${MAX_TICKET_LENGTH:-4000}
+    depends_on:
+      - wattio-mcp
+    # Volume persistente para o repositório clonado (sobrevive a restarts).
+    volumes:
+      - luna_repo:/app/repo
+    # Segurança do container.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.claude:exec
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # MCP server: expõe ferramentas de leitura do OpenSearch de tarefas (somente
+  # consulta). A Luna conecta nele via HTTP em http://wattio-mcp:8000/mcp.
+  wattio-mcp:
+    build:
+      context: ./wattio-mcp
+    image: wattio-opensearch-mcp:local
+    container_name: wattio-mcp
+    restart: unless-stopped
+    environment:
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # --- Conexão com o OpenSearch (preencha no .env) ---
+      OPENSEARCH_URL: ${OPENSEARCH_URL}
+      OPENSEARCH_USER: ${OPENSEARCH_USER:-}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-}
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-}
+      OPENSEARCH_ALLOWED_INDICES: ${OPENSEARCH_ALLOWED_INDICES:-}
+      OPENSEARCH_VERIFY_CERTS: ${OPENSEARCH_VERIFY_CERTS:-true}
+      OPENSEARCH_USE_AWS_AUTH: ${OPENSEARCH_USE_AWS_AUTH:-false}
+      AWS_REGION: ${AWS_REGION:-us-east-2}
+    # Não exposto ao host: acessível apenas pela rede interna do compose.
+    expose:
+      - "8000"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); sys.exit(0 if s.connect_ex(('127.0.0.1',8000))==0 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  luna_repo:
