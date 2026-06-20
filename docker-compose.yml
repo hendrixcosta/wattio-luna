@@ -36,6 +36,8 @@ services:
     # Volume persistente para o repositório clonado (sobrevive a restarts).
     volumes:
       - luna_repo:/app/repo
+      # UI de chat montada read-only: ajustes no HTML valem com refresh, sem rebuild.
+      - ./public:/app/public:ro
     # Segurança do container.
     read_only: true
     tmpfs:

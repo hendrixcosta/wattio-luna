@@ -1,10 +1,16 @@
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import pinoHttp from "pino-http";
 import { config, assertConfig } from "./config.js";
 import { logger } from "./utils/logger.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { askRouter } from "./routes/ask.js";
+import { chatRouter } from "./routes/chat.js";
 import { ensureRepo } from "./services/repo.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.join(__dirname, "..", "public");
 
 assertConfig();
 
@@ -22,9 +28,14 @@ app.use(pinoHttp({ logger }));
 // Healthcheck — não exige autenticação.
 app.get("/health", (req, res) => res.json({ status: "ok", agent: "luna" }));
 
+// Interface de chat (página estática) — pública; a API key é informada na UI e
+// enviada como Bearer nas chamadas autenticadas a /chat/stream.
+app.use(express.static(publicDir));
+
 // Tudo abaixo exige autenticação.
 app.use(authMiddleware);
 app.use("/", askRouter);
+app.use("/", chatRouter);
 
 // Handler de erro genérico (ex.: JSON malformado).
 app.use((err, req, res, _next) => {

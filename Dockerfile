@@ -25,6 +25,7 @@ RUN npm install --omit=dev
 COPY src ./src
 COPY prompts ./prompts
 COPY claude ./claude
+COPY public ./public
 
 # Script de askpass para o git: fornece o token via env GIT_TOKEN sem
 # persisti-lo na configuração do repositório (auth de LEITURA em repos privados).

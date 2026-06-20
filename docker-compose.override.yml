@@ -1,0 +1,31 @@
+# ============================================================
+# Override de DESENVOLVIMENTO (aplicado automaticamente pelo `docker compose`).
+# Adequa a Luna para rodar em localhost no servidor de desenvolvimento:
+#   - Publica a porta SOMENTE em 127.0.0.1 (não exposta na LAN/internet).
+#     O acesso do notebook é via encaminhamento de porta do VS Code Remote
+#     (ou túnel SSH), que mapeia o localhost do servidor -> localhost do notebook.
+#   - Live-reload: monta o código-fonte e usa `node --watch` (sem rebuild a cada edição).
+#   - Logs em nível debug.
+#
+# Para rodar como PRODUÇÃO neste mesmo host (0.0.0.0, imagem fixa, hardening),
+# ignore este override explicitamente:
+#   docker compose -f docker-compose.yml up -d --build
+# ============================================================
+services:
+  luna:
+    # Bind apenas no loopback do servidor — chega via VS Code port-forward / túnel SSH.
+    # !override SUBSTITUI a lista de ports da base (senão o Compose concatena e
+    # cria dois bindings conflitantes na mesma porta 8080).
+    ports: !override
+      - "127.0.0.1:${PORT:-8080}:8080"
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+    # --watch precisa reiniciar o processo; libera o rootfs (em dev) para isso.
+    read_only: false
+    # Monta o código para edição ao vivo (read-only dentro do container).
+    volumes:
+      - ./src:/app/src:ro
+      - ./prompts:/app/prompts:ro
+    # Reinicia o servidor automaticamente quando os arquivos em /app/src mudam.
+    command: ["node", "--watch", "src/server.js"]

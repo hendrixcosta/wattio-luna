@@ -1,11 +1,6 @@
 import { Router } from "express";
-import crypto from "node:crypto";
-import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
-import { parseTicket } from "../utils/parseTicket.js";
-import { buildSystemPrompt, buildUserPrompt } from "../services/prompt.js";
-import { runClaude } from "../services/claude.js";
-import { ensureRepo } from "../services/repo.js";
+import { runEnrichment, EnrichValidationError } from "../services/enrich.js";
 
 export const askRouter = Router();
 
@@ -18,52 +13,24 @@ export const askRouter = Router();
  * A Luna analisa o repositório local configurado em GIT_REPO_URL — garantido como
  * clonado/atualizado por ensureRepo() — e devolve o chamado enriquecido (contexto
  * técnico e funcional) pronto para o Notion.
+ *
+ * Observação: esta rota é SÍNCRONA — a conexão fica aberta durante toda a execução
+ * do Claude Code. Atrás de um proxy com timeout curto (ex.: nginx 60s), prefira o
+ * fluxo assíncrono por jobs em /chat/jobs (ver routes/chat.js).
  */
 async function handleEnrich(req, res) {
-  const requestId = crypto.randomUUID();
   const body = req.body || {};
   const input = body.ticket ?? body.message;
 
-  if (!input || typeof input !== "string") {
-    return res.status(400).json({ error: "Campo 'ticket' (relato do chamado) é obrigatório." });
-  }
-  if (input.length > config.maxTicketLength) {
-    return res.status(413).json({ error: `Chamado excede o limite de ${config.maxTicketLength} caracteres.` });
-  }
-
-  const { ticket } = parseTicket(input);
-  if (!ticket) {
-    return res.status(400).json({ error: "Relato do chamado vazio." });
-  }
-
-  logger.info({ requestId, repo: config.repoName, ticketLen: ticket.length }, "Novo chamado para enriquecer.");
-
   try {
-    // Garante que o código local esteja clonado e atualizado antes de analisar.
-    await ensureRepo();
-
-    const systemPrompt = await buildSystemPrompt();
-    const userPrompt = buildUserPrompt({ ticket });
-
-    const { text, raw, durationMs } = await runClaude({ systemPrompt, userPrompt, requestId });
-
-    logger.info({ requestId, durationMs, costUsd: raw?.total_cost_usd }, "Chamado enriquecido.");
-
-    return res.json({
-      requestId,
-      repo: config.repoName,
-      ticket,
-      enrichment: text,
-      meta: {
-        model: config.claudeModel,
-        durationMs,
-        numTurns: raw?.num_turns,
-        costUsd: raw?.total_cost_usd,
-      },
-    });
+    const result = await runEnrichment({ input });
+    return res.json(result);
   } catch (err) {
-    logger.error({ requestId, err: err.message }, "Erro ao enriquecer o chamado.");
-    return res.status(502).json({ requestId, error: err.message });
+    if (err instanceof EnrichValidationError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    logger.error({ err: err.message }, "Erro ao enriquecer o chamado.");
+    return res.status(502).json({ error: err.message });
   }
 }
 

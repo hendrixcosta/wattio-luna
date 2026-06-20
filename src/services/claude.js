@@ -167,3 +167,183 @@ export function runClaude({ systemPrompt, userPrompt, requestId }) {
     });
   });
 }
+
+/** Resumo curto e legível do input de uma ferramenta, para narrar o progresso. */
+function describeTool(name, input = {}) {
+  switch (name) {
+    case "Read":
+      return { icon: "📖", label: `Lendo ${shorten(input.file_path)}` };
+    case "Grep":
+      return { icon: "🔍", label: `Buscando "${shorten(input.pattern, 60)}"${input.path ? ` em ${shorten(input.path)}` : ""}` };
+    case "Glob":
+      return { icon: "📁", label: `Procurando arquivos ${shorten(input.pattern, 60)}` };
+    case "LS":
+      return { icon: "📂", label: `Explorando ${shorten(input.path) || "diretório"}` };
+    case "WebFetch":
+      return { icon: "🌐", label: `Abrindo link do chamado ${shorten(input.url, 60)}` };
+    default:
+      if (name.startsWith("mcp__")) {
+        const tool = name.split("__").pop();
+        return { icon: "🧰", label: `Consultando tarefas (OpenSearch): ${tool}` };
+      }
+      // Ferramentas fora do escopo de leitura (ex.: tentativas internas do agente)
+      // não viram narração — manteria o painel poluído sem valor para quem testa.
+      return null;
+  }
+}
+
+/** Encurta caminhos/strings para exibição (mantém a parte final dos caminhos). */
+function shorten(value, max = 48) {
+  if (!value) return "";
+  const str = String(value);
+  if (str.length <= max) return str;
+  return "…" + str.slice(-(max - 1));
+}
+
+/**
+ * Variante STREAMING do runClaude: usa `--output-format stream-json` para emitir
+ * eventos do agente em tempo real e os traduz em narração amigável + texto parcial.
+ *
+ * Chama `onEvent(evt)` para cada evento. Tipos de evt:
+ *   { type: "status", icon, text }   passo de raciocínio / uso de ferramenta
+ *   { type: "delta",  text }         pedaço incremental da resposta final
+ *
+ * Resolve com { text, raw, durationMs } igual ao runClaude.
+ *
+ * @param {object} params
+ * @param {(evt: object) => void} params.onEvent
+ */
+export function streamClaude({ systemPrompt, userPrompt, requestId, onEvent = () => {} }) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      "-p", userPrompt,
+      "--append-system-prompt", systemPrompt,
+      "--model", config.claudeModel,
+      "--add-dir", config.repoDir,
+      "--allowedTools", buildAllowedTools(),
+      "--disallowedTools", DISALLOWED_TOOLS,
+      "--permission-mode", "default",
+      "--max-turns", String(config.maxTurns),
+      "--output-format", "stream-json",
+      "--include-partial-messages",
+      "--verbose",
+    ];
+
+    const mcpConfig = buildMcpConfig();
+    if (mcpConfig) {
+      args.push("--mcp-config", mcpConfig, "--strict-mcp-config");
+    }
+
+    const authEnv = config.claudeOAuthToken
+      ? { CLAUDE_CODE_OAUTH_TOKEN: config.claudeOAuthToken, ANTHROPIC_API_KEY: undefined }
+      : { ANTHROPIC_API_KEY: config.anthropicApiKey };
+
+    const child = spawn(config.claudeBin, args, {
+      cwd: config.repoDir,
+      env: {
+        ...process.env,
+        ...authEnv,
+        ANTHROPIC_MODEL: config.claudeModel,
+        HOME: "/app",
+        DISABLE_AUTOUPDATER: "1",
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const startedAt = Date.now();
+    let stderr = "";
+    let buffer = "";
+    let finalText = "";
+    let finalRaw = null;
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      logger.warn({ requestId }, "Claude Code (stream) excedeu o tempo limite, encerrando.");
+      child.kill("SIGKILL");
+      finish(new Error("Tempo limite excedido ao executar o Claude Code."));
+    }, config.claudeTimeoutMs);
+
+    function finish(err) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (err) return reject(err);
+      resolve({ text: finalText, raw: finalRaw, durationMs: Date.now() - startedAt });
+    }
+
+    /** Processa um objeto de evento do stream-json. */
+    function handleEvent(evt) {
+      switch (evt.type) {
+        case "system":
+          if (evt.subtype === "init") {
+            onEvent({ type: "status", icon: "🧠", text: "Analisando o chamado e o código do repositório…" });
+          }
+          break;
+
+        case "assistant": {
+          // Mensagem (parcial ou completa) do assistente: blocos de texto e tool_use.
+          const content = evt.message?.content || [];
+          for (const block of content) {
+            if (block.type === "tool_use") {
+              const desc = describeTool(block.name, block.input);
+              if (desc) onEvent({ type: "status", icon: desc.icon, text: desc.label });
+            }
+          }
+          break;
+        }
+
+        case "stream_event": {
+          // Deltas incrementais — é daqui que sai o preenchimento gradual do texto.
+          const inner = evt.event;
+          if (inner?.type === "content_block_delta" && inner.delta?.type === "text_delta") {
+            const piece = inner.delta.text || "";
+            finalText += piece;
+            onEvent({ type: "delta", text: piece });
+          }
+          break;
+        }
+
+        case "result": {
+          finalRaw = evt;
+          // O texto consolidado do result é a fonte da verdade (caso deltas falhem).
+          const consolidated = evt.result ?? evt.text ?? "";
+          if (evt.is_error) {
+            return finish(new Error(consolidated || "Claude Code retornou erro."));
+          }
+          if (consolidated && consolidated.length >= finalText.length) {
+            finalText = consolidated;
+          }
+          finish(null);
+          break;
+        }
+      }
+    }
+
+    child.stdout.on("data", (d) => {
+      buffer += d.toString();
+      let nl;
+      while ((nl = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          handleEvent(JSON.parse(line));
+        } catch {
+          /* linha não-JSON (ruído); ignora */
+        }
+      }
+    });
+
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+
+    child.on("error", (err) => finish(new Error(`Falha ao iniciar o Claude Code: ${err.message}`)));
+
+    child.on("close", (code) => {
+      if (settled) return;
+      if (finalText.trim()) return finish(null); // terminou sem evento result explícito
+      logger.error({ requestId, code, stderr: stderr.slice(0, 2000) }, "Claude Code (stream) encerrou sem resposta.");
+      finish(new Error(stderr.trim() || `Claude Code finalizou com código ${code}.`));
+    });
+  });
+}

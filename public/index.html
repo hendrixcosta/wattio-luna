@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Luna 🌙 — Enriquecimento de Chamados</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: #141821;
+      --panel-2: #1b2130;
+      --border: #262d3d;
+      --text: #e6e9f0;
+      --muted: #8b93a7;
+      --accent: #8b7cf6;
+      --accent-2: #5eead4;
+      --user: #232a3a;
+      --ok: #4ade80;
+      --err: #f87171;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: radial-gradient(1200px 700px at 80% -10%, #1a1530 0%, var(--bg) 55%) fixed;
+      color: var(--text);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      background: rgba(20,24,33,.7); backdrop-filter: blur(8px);
+    }
+    header .logo { font-size: 22px; }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+    header .sub { color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+    header .spacer { flex: 1; }
+    .key-wrap { display: flex; align-items: center; gap: 8px; }
+    .key-wrap input {
+      background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+      border-radius: 9px; padding: 8px 11px; width: 230px; font-size: 13px; outline: none;
+    }
+    .key-wrap input:focus { border-color: var(--accent); }
+    .key-wrap input.missing { border-color: var(--err); animation: shake .35s; }
+    .key-wrap input.missing::placeholder { color: var(--err); }
+    @keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .dot.err { background: var(--err); }
+
+    main { flex: 1; overflow-y: auto; padding: 24px 0; }
+    .feed { max-width: 880px; margin: 0 auto; padding: 0 20px; display: flex; flex-direction: column; gap: 22px; }
+
+    .msg { display: flex; gap: 12px; }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 9px; flex: 0 0 34px;
+      display: grid; place-items: center; font-size: 17px; user-select: none;
+    }
+    .msg.user .avatar { background: var(--user); }
+    .msg.luna .avatar { background: linear-gradient(135deg, var(--accent), #6d5ce0); }
+    .bubble { flex: 1; min-width: 0; }
+    .role { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .msg.user .content {
+      background: var(--user); border: 1px solid var(--border);
+      padding: 10px 14px; border-radius: var(--radius); border-top-left-radius: 4px;
+      white-space: pre-wrap; word-wrap: break-word;
+    }
+
+    /* Painel de "pensamento" / progresso */
+    .steps {
+      border: 1px solid var(--border); background: var(--panel);
+      border-radius: 12px; margin-bottom: 12px; overflow: hidden;
+    }
+    .steps summary {
+      cursor: pointer; list-style: none; padding: 9px 13px;
+      display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--muted);
+    }
+    .steps summary::-webkit-details-marker { display: none; }
+    .steps .now { color: var(--text); }
+    .spinner {
+      width: 13px; height: 13px; border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .steps ul { margin: 0; padding: 4px 13px 11px 13px; list-style: none; border-top: 1px solid var(--border); }
+    .steps li { font-size: 12.5px; color: var(--muted); padding: 3px 0; display: flex; gap: 8px; }
+    .steps li .ic { width: 18px; text-align: center; }
+    .steps.done summary .spinner { display: none; }
+    .steps .check { color: var(--ok); }
+
+    /* Corpo da resposta (markdown) */
+    .answer { word-wrap: break-word; }
+    .answer h1, .answer h2, .answer h3 { line-height: 1.3; margin: 18px 0 8px; }
+    .answer h1 { font-size: 19px; }
+    .answer h2 { font-size: 17px; }
+    .answer h3 { font-size: 15px; color: var(--accent-2); }
+    .answer p { margin: 8px 0; }
+    .answer ul, .answer ol { margin: 8px 0; padding-left: 22px; }
+    .answer li { margin: 3px 0; }
+    .answer code {
+      background: var(--panel-2); border: 1px solid var(--border);
+      padding: 1px 5px; border-radius: 5px; font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .answer pre {
+      background: var(--panel-2); border: 1px solid var(--border);
+      padding: 12px 14px; border-radius: 10px; overflow-x: auto; margin: 10px 0;
+    }
+    .answer pre code { background: none; border: none; padding: 0; }
+    .answer strong { color: #fff; }
+    .answer .cursor { display: inline-block; width: 7px; height: 15px; background: var(--accent);
+      vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+    @keyframes blink { 0%,50% { opacity: 1 } 50.01%,100% { opacity: 0 } }
+    .meta { font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+    .errbox { color: var(--err); border: 1px solid #5b2330; background: #2a161b; padding: 10px 13px; border-radius: 10px; }
+
+    /* Composer */
+    footer { border-top: 1px solid var(--border); background: rgba(20,24,33,.7); backdrop-filter: blur(8px); }
+    .composer { max-width: 880px; margin: 0 auto; padding: 14px 20px; display: flex; gap: 10px; align-items: flex-end; }
+    .composer textarea {
+      flex: 1; resize: none; background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+      font: inherit; max-height: 180px; outline: none;
+    }
+    .composer textarea:focus { border-color: var(--accent); }
+    .composer button {
+      background: linear-gradient(135deg, var(--accent), #6d5ce0); color: #fff; border: none;
+      border-radius: 12px; padding: 0 18px; height: 46px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .composer button:disabled { opacity: .45; cursor: not-allowed; }
+    .hint { max-width: 880px; margin: 0 auto; padding: 0 20px 12px; color: var(--muted); font-size: 11.5px; }
+    .empty { text-align: center; color: var(--muted); margin-top: 8vh; }
+    .empty h2 { color: var(--text); font-weight: 600; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+    .chip { border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+      padding: 8px 13px; border-radius: 999px; cursor: pointer; font-size: 13px; }
+    .chip:hover { color: var(--text); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🌙</div>
+    <div>
+      <h1>Luna</h1>
+      <div class="sub">Enriquecimento técnico de chamados · analisa o código real do repositório</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="key-wrap">
+      <span id="status-dot" class="dot" title="status da API"></span>
+      <input id="apikey" type="password" placeholder="API key (Bearer)" autocomplete="off" spellcheck="false" />
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="feed" id="feed">
+      <div class="empty" id="empty">
+        <div style="font-size:46px">🌙</div>
+        <h2>Descreva um chamado para a Luna enriquecer</h2>
+        <div>Ela investiga o código-fonte do repositório e devolve o contexto técnico e funcional.</div>
+        <div class="chips" id="chips">
+          <div class="chip">Não consigo gerar a fatura desse cliente.</div>
+          <div class="chip">O cálculo de imposto da nota fiscal está errado.</div>
+          <div class="chip">O e-mail de cobrança não está sendo enviado.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Descreva o chamado do usuário…"></textarea>
+      <button id="send">Enriquecer</button>
+    </div>
+    <div class="hint">Enter envia · Shift+Enter quebra linha · cada chamado roda o Claude Code sobre o repositório (pode levar alguns minutos).</div>
+  </footer>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const feed = $("#feed"), input = $("#input"), sendBtn = $("#send");
+    const keyInput = $("#apikey"), dot = $("#status-dot"), empty = $("#empty");
+
+    // Persiste a API key localmente para não digitar a cada vez.
+    keyInput.value = localStorage.getItem("luna_key") || "";
+    keyInput.addEventListener("change", () => { localStorage.setItem("luna_key", keyInput.value.trim()); checkHealth(); });
+
+    // Health indica se a API está no ar.
+    async function checkHealth() {
+      try {
+        const r = await fetch("/health");
+        dot.className = "dot " + (r.ok ? "ok" : "err");
+      } catch { dot.className = "dot err"; }
+    }
+    checkHealth();
+
+    // textarea auto-resize
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 180) + "px";
+    });
+    input.addEventListener("keydown", (e) => {
+      // Ignora Enter durante composição de IME/acentos (PT-BR): keyCode 229 / isComposing.
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+        e.preventDefault();
+        submit();
+      }
+    });
+    sendBtn.addEventListener("click", submit);
+    $("#chips")?.addEventListener("click", (e) => {
+      if (e.target.classList.contains("chip")) { input.value = e.target.textContent; input.focus(); submit(); }
+    });
+
+    // ---------- Markdown mínimo (sem dependências externas) ----------
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+    function inline(s) {
+      return escapeHtml(s)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    }
+    function renderMarkdown(md) {
+      const lines = md.split("\n");
+      let html = "", inList = false, listTag = "", inCode = false, codeBuf = "";
+      const closeList = () => { if (inList) { html += `</${listTag}>`; inList = false; } };
+      for (const raw of lines) {
+        const line = raw;
+        if (/^```/.test(line.trim())) {
+          if (inCode) { html += `<pre><code>${escapeHtml(codeBuf)}</code></pre>`; codeBuf = ""; inCode = false; }
+          else { closeList(); inCode = true; }
+          continue;
+        }
+        if (inCode) { codeBuf += line + "\n"; continue; }
+        const h = line.match(/^(#{1,6})\s+(.*)$/);
+        if (h) { closeList(); const n = Math.min(h[1].length, 3); html += `<h${n}>${inline(h[2])}</h${n}>`; continue; }
+        const ul = line.match(/^\s*[-*]\s+(.*)$/);
+        const ol = line.match(/^\s*\d+\.\s+(.*)$/);
+        if (ul || ol) {
+          const want = ul ? "ul" : "ol";
+          if (inList && listTag !== want) closeList();
+          if (!inList) { listTag = want; html += `<${want}>`; inList = true; }
+          html += `<li>${inline((ul || ol)[1])}</li>`;
+          continue;
+        }
+        if (line.trim() === "") { closeList(); continue; }
+        closeList();
+        html += `<p>${inline(line)}</p>`;
+      }
+      if (inCode) html += `<pre><code>${escapeHtml(codeBuf)}</code></pre>`;
+      closeList();
+      return html;
+    }
+
+    // ---------- Construção das mensagens ----------
+    function addUser(text) {
+      empty?.remove();
+      const el = document.createElement("div");
+      el.className = "msg user";
+      el.innerHTML = `<div class="avatar">🧑</div><div class="bubble"><div class="role">Você</div><div class="content"></div></div>`;
+      el.querySelector(".content").textContent = text;
+      feed.appendChild(el);
+      scroll();
+    }
+
+    function addLuna() {
+      empty?.remove();
+      const el = document.createElement("div");
+      el.className = "msg luna";
+      el.innerHTML = `
+        <div class="avatar">🌙</div>
+        <div class="bubble">
+          <div class="role">Luna</div>
+          <details class="steps" open>
+            <summary><span class="spinner"></span><span class="now">Iniciando…</span></summary>
+            <ul></ul>
+          </details>
+          <div class="answer"></div>
+          <div class="meta" style="display:none"></div>
+        </div>`;
+      feed.appendChild(el);
+      scroll();
+      return {
+        steps: el.querySelector(".steps"),
+        now: el.querySelector(".now"),
+        list: el.querySelector(".steps ul"),
+        answer: el.querySelector(".answer"),
+        meta: el.querySelector(".meta"),
+      };
+    }
+
+    function scroll() { $("#main").scrollTop = $("#main").scrollHeight; }
+
+    let busy = false;
+    function setBusy(b) { busy = b; sendBtn.disabled = b; sendBtn.textContent = b ? "Analisando…" : "Enriquecer"; }
+
+    // Feedback visível quando falta a API key (antes falhava em silêncio no Enter).
+    function flashKey() {
+      dot.className = "dot err";
+      keyInput.classList.remove("missing"); void keyInput.offsetWidth; // reinicia a animação
+      keyInput.classList.add("missing");
+      keyInput.placeholder = "⚠️ informe a API key";
+      keyInput.focus();
+    }
+    keyInput.addEventListener("input", () => keyInput.classList.remove("missing"));
+
+    async function submit() {
+      if (busy) return;
+      const text = input.value.trim();
+      const key = keyInput.value.trim();
+      if (!text) return;
+      if (!key) { flashKey(); return; }
+
+      addUser(text);
+      input.value = ""; input.style.height = "auto";
+      setBusy(true);
+      const ui = addLuna();
+      let answerText = "";
+
+      const render = () => { ui.answer.innerHTML = renderMarkdown(answerText) + '<span class="cursor"></span>'; scroll(); };
+
+      try {
+        const resp = await fetch("/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+          body: JSON.stringify({ ticket: text }),
+        });
+        if (!resp.ok && resp.headers.get("content-type")?.includes("application/json")) {
+          const e = await resp.json();
+          throw new Error(e.error || ("HTTP " + resp.status));
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let nl;
+          while ((nl = buf.indexOf("\n")) !== -1) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (!line) continue;
+            let evt; try { evt = JSON.parse(line); } catch { continue; }
+            handle(evt);
+          }
+        }
+        function handle(evt) {
+          if (evt.type === "status") {
+            ui.now.textContent = `${evt.icon || "•"} ${evt.text}`;
+            const li = document.createElement("li");
+            li.innerHTML = `<span class="ic">${evt.icon || "•"}</span><span>${escapeHtml(evt.text)}</span>`;
+            ui.list.appendChild(li);
+            scroll();
+          } else if (evt.type === "delta") {
+            if (answerText === "") { ui.now.textContent = "✍️ Escrevendo o enriquecimento…"; }
+            answerText += evt.text;
+            render();
+          } else if (evt.type === "done") {
+            ui.steps.classList.add("done");
+            ui.steps.removeAttribute("open");
+            ui.now.innerHTML = `<span class="check">✓</span> Concluído`;
+            ui.answer.innerHTML = renderMarkdown(answerText);
+            const m = evt.meta || {};
+            const secs = m.durationMs ? (m.durationMs / 1000).toFixed(1) + "s" : "";
+            const cost = m.costUsd != null ? " · $" + Number(m.costUsd).toFixed(4) : "";
+            ui.meta.style.display = "block";
+            ui.meta.textContent = `${evt.repo || ""} · ${m.model || ""}${secs ? " · " + secs : ""}${m.numTurns ? " · " + m.numTurns + " turnos" : ""}${cost}`;
+            scroll();
+          } else if (evt.type === "error") {
+            ui.steps.classList.add("done");
+            ui.now.innerHTML = `<span style="color:var(--err)">✕ Falhou</span>`;
+            ui.answer.innerHTML = `<div class="errbox">${escapeHtml(evt.error || "Erro desconhecido.")}</div>`;
+            scroll();
+          }
+          // ping: ignorado (só mantém a conexão viva)
+        }
+      } catch (err) {
+        ui.steps.classList.add("done");
+        ui.now.innerHTML = `<span style="color:var(--err)">✕ Falhou</span>`;
+        ui.answer.innerHTML = `<div class="errbox">${escapeHtml(err.message)}</div>`;
+      } finally {
+        setBusy(false);
+      }
+    }
+  </script>
+</body>
+</html>
