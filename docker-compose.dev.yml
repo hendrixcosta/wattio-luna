@@ -1,5 +1,7 @@
 # ============================================================
-# Override de DESENVOLVIMENTO (aplicado automaticamente pelo `docker compose`).
+# Override de DESENVOLVIMENTO (NÃO aplicado automaticamente — nome fora do
+# padrão `docker-compose.override.yml` de propósito, para que `docker compose
+# up` neste host sirva produção por padrão).
 # Adequa a Luna para rodar em localhost no servidor de desenvolvimento:
 #   - Publica a porta SOMENTE em 127.0.0.1 (não exposta na LAN/internet).
 #     O acesso do notebook é via encaminhamento de porta do VS Code Remote
@@ -7,9 +9,11 @@
 #   - Live-reload: monta o código-fonte e usa `node --watch` (sem rebuild a cada edição).
 #   - Logs em nível debug.
 #
-# Para rodar como PRODUÇÃO neste mesmo host (0.0.0.0, imagem fixa, hardening),
-# ignore este override explicitamente:
-#   docker compose -f docker-compose.yml up -d --build
+# Para rodar em modo DESENVOLVIMENTO, inclua este arquivo explicitamente:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Para PRODUÇÃO (0.0.0.0, imagem fixa, hardening), o padrão já é suficiente:
+#   docker compose up -d --build
 # ============================================================
 services:
   luna:
