@@ -12,7 +12,7 @@ TICKET="${1:?informe o relato do chamado, ex: 'Não consigo gerar a fatura desse
 
 BODY=$(printf '{"ticket":%s}' "$(jq -Rn --arg t "$TICKET" '$t')")
 
-curl -sS -X POST "$HOST/enrich" \
+curl -sS -X POST "$HOST/ask" \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d "$BODY" | jq .

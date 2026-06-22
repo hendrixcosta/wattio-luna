@@ -16,14 +16,20 @@ async function loadPrompt(name) {
 }
 
 /**
- * Monta o system prompt completo da Luna (agente de enriquecimento de chamados):
- *  - base: papel de Analista de Sistemas Sênior + regras inegociáveis (somente leitura).
- *  - enriquecimento: a tarefa e o formato de saída estruturado para o Notion.
+ * Monta o system prompt completo da Luna conforme o modo de operação:
+ *  - base: papel de Analista de Sistemas Sênior + regras inegociáveis (somente leitura)
+ *    + ordem de investigação. É comum aos dois modos.
+ *  - tarefa: depende do modo —
+ *      "enrich"  → `enriquecimento.md` (enriquecer o chamado; saída estruturada p/ Notion).
+ *      "answer"  → `resposta.md` (responder uma pergunta específica sobre a task).
  *  - contexto do repositório LOCAL clonado.
+ *
+ * @param {object} [params]
+ * @param {"enrich"|"answer"} [params.mode="enrich"]
  */
-export async function buildSystemPrompt() {
+export async function buildSystemPrompt({ mode = "enrich" } = {}) {
   const base = await loadPrompt("system-base");
-  const enrichment = await loadPrompt("enriquecimento");
+  const taskPrompt = await loadPrompt(mode === "answer" ? "resposta" : "enriquecimento");
 
   const repoContext = [
     "## Repositório alvo (local)",
@@ -33,7 +39,7 @@ export async function buildSystemPrompt() {
     "Não navegue livremente na internet nem acesse o GitHub: para o código, baseie-se exclusivamente nos arquivos locais. As únicas saídas externas permitidas são o MCP de chamados e o WebFetch (apenas para abrir links citados nos comentários do chamado).",
   ].join("\n");
 
-  const parts = [base, enrichment, repoContext];
+  const parts = [base, taskPrompt, repoContext];
 
   // Quando o MCP wattio está ativo, a Luna também pode consultar as tarefas
   // operacionais (OpenSearch) para correlacionar o chamado com registros reais.
@@ -67,11 +73,58 @@ export async function buildSystemPrompt() {
 }
 
 /**
- * Monta o prompt do usuário: o relato do chamado a ser enriquecido.
+ * Monta o prompt do usuário conforme o modo:
+ *
+ *  - "answer": há uma pergunta específica sobre uma task. Instrui a Luna a
+ *    recuperar a task no MCP, ler comentários/anexos, investigar o código e
+ *    responder objetivamente APENAS a pergunta.
+ *  - "enrich" com taskId: veio só a referência da task. O "relato" é o próprio
+ *    conteúdo da task, que deve ser recuperado no MCP antes de enriquecer.
+ *  - "enrich" com relato livre (sem taskId): comportamento clássico — o texto
+ *    recebido é o relato a enriquecer.
+ *
+ * @param {object} params
+ * @param {string} params.ticket           Texto normalizado recebido.
+ * @param {"enrich"|"answer"} [params.mode="enrich"]
+ * @param {string|null} [params.taskId]    Ex.: "TASK-12344" (quando reconhecido).
+ * @param {string} [params.question]       Pergunta do usuário (modo "answer").
  */
-export function buildUserPrompt({ ticket }) {
+export function buildUserPrompt({ ticket, mode = "enrich", taskId = null, question = "" }) {
+  if (mode === "answer" && taskId) {
+    return [
+      `Responda à pergunta abaixo sobre a task **${taskId}**, seguindo o formato definido.`,
+      "",
+      "Primeiro recupere a task no MCP (`get_task_by_id`), entenda o domínio do chamado,",
+      "leia os comentários (`get_task_comments`) e os anexos (`get_task_attachments`), e",
+      "investigue o código relacionado. Só então responda — objetivamente e apenas o que",
+      "foi perguntado.",
+      "",
+      "## Task",
+      taskId,
+      "",
+      "## Pergunta",
+      question,
+    ].join("\n");
+  }
+
+  if (mode === "enrich" && taskId) {
+    return [
+      `Enriqueça a task **${taskId}** seguindo o formato de resposta definido.`,
+      "",
+      "Recupere a task no MCP (`get_task_by_id`) e use o conteúdo dela como o relato do",
+      "chamado. Leia os comentários (`get_task_comments`) e os anexos",
+      "(`get_task_attachments`), investigue o código relacionado e produza a descrição",
+      "enriquecida. Retorne **apenas** o enriquecimento, pronto para colar no Notion.",
+      "",
+      "## Task",
+      taskId,
+    ].join("\n");
+  }
+
+  // Relato livre em texto (sem referência de task reconhecida).
   return [
     "Enriqueça o chamado de suporte abaixo seguindo o formato de resposta definido.",
+    "Retorne **apenas** o enriquecimento, pronto para colar no Notion.",
     "",
     "## Relato do usuário",
     ticket,

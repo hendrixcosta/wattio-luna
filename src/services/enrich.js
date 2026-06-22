@@ -17,8 +17,8 @@ export class EnrichValidationError extends Error {
 }
 
 /**
- * Núcleo do enriquecimento, compartilhado entre a rota síncrona (POST /enrich)
- * e o fluxo assíncrono por jobs (POST /chat/jobs). Valida o relato, garante o
+ * Núcleo do enriquecimento, compartilhado entre a rota síncrona (POST /ask)
+ * e o streaming da interface de chat (POST /chat/stream). Valida o relato, garante o
  * repositório clonado/atualizado, monta os prompts e executa o Claude Code.
  *
  * @param {object} params
@@ -34,27 +34,29 @@ export async function runEnrichment({ input, requestId = crypto.randomUUID() }) 
     throw new EnrichValidationError(413, `Chamado excede o limite de ${config.maxTicketLength} caracteres.`);
   }
 
-  const { ticket } = parseTicket(input);
+  const { ticket, mode, taskId, question } = parseTicket(input);
   if (!ticket) {
     throw new EnrichValidationError(400, "Relato do chamado vazio.");
   }
 
-  logger.info({ requestId, repo: config.repoName, ticketLen: ticket.length }, "Novo chamado para enriquecer.");
+  logger.info({ requestId, repo: config.repoName, mode, taskId, ticketLen: ticket.length }, "Nova solicitação para a Luna.");
 
   // Garante que o código local esteja clonado e atualizado antes de analisar.
   await ensureRepo();
 
-  const systemPrompt = await buildSystemPrompt();
-  const userPrompt = buildUserPrompt({ ticket });
+  const systemPrompt = await buildSystemPrompt({ mode });
+  const userPrompt = buildUserPrompt({ ticket, mode, taskId, question });
 
   const { text, raw, durationMs } = await runClaude({ systemPrompt, userPrompt, requestId });
 
-  logger.info({ requestId, durationMs, costUsd: raw?.total_cost_usd }, "Chamado enriquecido.");
+  logger.info({ requestId, mode, durationMs, costUsd: raw?.total_cost_usd }, "Solicitação concluída.");
 
   return {
     requestId,
     repo: config.repoName,
     ticket,
+    mode,
+    taskId,
     enrichment: text,
     meta: {
       model: config.claudeModel,
@@ -84,27 +86,29 @@ export async function runEnrichmentStream({ input, requestId = crypto.randomUUID
     throw new EnrichValidationError(413, `Chamado excede o limite de ${config.maxTicketLength} caracteres.`);
   }
 
-  const { ticket } = parseTicket(input);
+  const { ticket, mode, taskId, question } = parseTicket(input);
   if (!ticket) {
     throw new EnrichValidationError(400, "Relato do chamado vazio.");
   }
 
-  logger.info({ requestId, repo: config.repoName, ticketLen: ticket.length }, "Novo chamado para enriquecer (stream).");
+  logger.info({ requestId, repo: config.repoName, mode, taskId, ticketLen: ticket.length }, "Nova solicitação para a Luna (stream).");
 
   onEvent({ type: "status", icon: "📦", text: `Preparando o repositório ${config.repoName}…` });
   await ensureRepo();
 
-  const systemPrompt = await buildSystemPrompt();
-  const userPrompt = buildUserPrompt({ ticket });
+  const systemPrompt = await buildSystemPrompt({ mode });
+  const userPrompt = buildUserPrompt({ ticket, mode, taskId, question });
 
   const { text, raw, durationMs } = await streamClaude({ systemPrompt, userPrompt, requestId, onEvent });
 
-  logger.info({ requestId, durationMs, costUsd: raw?.total_cost_usd }, "Chamado enriquecido (stream).");
+  logger.info({ requestId, mode, durationMs, costUsd: raw?.total_cost_usd }, "Solicitação concluída (stream).");
 
   return {
     requestId,
     repo: config.repoName,
     ticket,
+    mode,
+    taskId,
     enrichment: text,
     meta: {
       model: config.claudeModel,

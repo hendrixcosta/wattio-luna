@@ -1,0 +1,218 @@
+{
+  "info": {
+    "name": "Wattio Luna API",
+    "_postman_id": "a1b2c3d4-luna-0000-0000-wattioluna01",
+    "description": "Coleção de testes das rotas da Luna — agente de IA que enriquece chamados de suporte analisando o código-fonte do repositório local com Claude Code.\n\n## Variáveis (na aba Variables da coleção)\n- `host`     → base da API. Ex.: `http://localhost:8080` (local) ou `https://luna.wattio.com.br` (produção).\n- `apiKey`   → uma das chaves definidas em `LUNA_API_KEYS`. Enviada como `Authorization: Bearer {{apiKey}}`.\n- `ticket`   → texto do chamado usado nas requisições de enriquecimento.\n\nA autenticação por Bearer está configurada no nível da coleção; todas as rotas a herdam, exceto `GET /health` (auth: No Auth).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{apiKey}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    {
+      "key": "host",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Base da API Luna (sem barra final)."
+    },
+    {
+      "key": "apiKey",
+      "value": "troque-esta-chave",
+      "type": "string",
+      "description": "Chave de API (uma das definidas em LUNA_API_KEYS)."
+    },
+    {
+      "key": "ticket",
+      "value": "Não estou conseguindo gerar a fatura desse cliente.",
+      "type": "string",
+      "description": "Texto do chamado de suporte a ser enriquecido."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{host}}/health",
+          "host": ["{{host}}"],
+          "path": ["health"]
+        },
+        "description": "Healthcheck público (sem autenticação). Deve responder `{ \"status\": \"ok\", \"agent\": \"luna\" }`."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('agent é luna', () => pm.expect(pm.response.json().agent).to.eql('luna'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ask — enriquecer (POST /ask)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticket\": \"{{ticket}}\"\n}"
+        },
+        "url": {
+          "raw": "{{host}}/ask",
+          "host": ["{{host}}"],
+          "path": ["ask"]
+        },
+        "description": "Rota ÚNICA e SÍNCRONA — a conexão fica aberta durante toda a execução do Claude Code (pode levar minutos). Quando o relato traz só a referência da task (ex.: `TASK-12344`) ou um relato livre, a Luna ENRIQUECE o chamado. Header de auth herdado da coleção. Aceita também o campo legado `message`."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ask — responder pergunta (POST /ask)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticket\": \"task 12344 - qual permissão está atrelada hoje?\"\n}"
+        },
+        "url": {
+          "raw": "{{host}}/ask",
+          "host": ["{{host}}"],
+          "path": ["ask"]
+        },
+        "description": "Mesma rota /ask. Quando o relato traz uma referência de task SEGUIDA de uma pergunta, a Luna NÃO enriquece — ela responde objetivamente apenas a pergunta sobre a task."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat Stream (POST /chat/stream)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticket\": \"{{ticket}}\"\n}"
+        },
+        "url": {
+          "raw": "{{host}}/chat/stream",
+          "host": ["{{host}}"],
+          "path": ["chat", "stream"]
+        },
+        "description": "Streaming NDJSON (application/x-ndjson): uma linha JSON por evento.\nEventos: `status` (passo em andamento), `delta` (pedaço da resposta), `done` (fim + metadados), `error` (falha), `ping` (heartbeat).\n\nObservação: o Postman exibe a resposta NDJSON completa ao final; o efeito de tempo real é melhor observado em `curl` ou na UI de chat (`/`)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('content-type NDJSON', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('x-ndjson'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth — sem chave (401 esperado)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticket\": \"{{ticket}}\"\n}"
+        },
+        "url": {
+          "raw": "{{host}}/ask",
+          "host": ["{{host}}"],
+          "path": ["ask"]
+        },
+        "description": "Teste negativo: sem Authorization a API deve responder 401."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth — chave inválida (403 esperado)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "chave-invalida-xyz", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticket\": \"{{ticket}}\"\n}"
+        },
+        "url": {
+          "raw": "{{host}}/ask",
+          "host": ["{{host}}"],
+          "path": ["ask"]
+        },
+        "description": "Teste negativo: com chave inválida a API deve responder 403."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 403', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

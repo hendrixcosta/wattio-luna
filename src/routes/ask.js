@@ -5,18 +5,21 @@ import { runEnrichment, EnrichValidationError } from "../services/enrich.js";
 export const askRouter = Router();
 
 /**
- * POST /enrich  (alias: POST /ask)
+ * POST /ask — rota ÚNICA de entrada (síncrona, JSON).
  * Body: { "ticket": "Não estou conseguindo gerar a fatura desse cliente." }
  *        (também aceita o campo legado "message")
  * Header: Authorization: Bearer <api-key>  (ou x-api-key)
  *
+ * O comportamento é decidido pelo conteúdo do relato (ver parseTicket):
+ *  - veio APENAS a referência da task (ou um relato livre) → enriquecer o chamado;
+ *  - veio a task SEGUIDA de uma pergunta → responder apenas a pergunta.
+ *
  * A Luna analisa o repositório local configurado em GIT_REPO_URL — garantido como
- * clonado/atualizado por ensureRepo() — e devolve o chamado enriquecido (contexto
- * técnico e funcional) pronto para o Notion.
+ * clonado/atualizado por ensureRepo() — e devolve a resposta pronta para o Notion.
  *
  * Observação: esta rota é SÍNCRONA — a conexão fica aberta durante toda a execução
- * do Claude Code. Atrás de um proxy com timeout curto (ex.: nginx 60s), prefira o
- * fluxo assíncrono por jobs em /chat/jobs (ver routes/chat.js).
+ * do Claude Code. Para o fluxo em tempo real da interface de chat, use o streaming
+ * em /chat/stream (ver routes/chat.js).
  */
 async function handleEnrich(req, res) {
   const body = req.body || {};
@@ -34,5 +37,4 @@ async function handleEnrich(req, res) {
   }
 }
 
-askRouter.post("/enrich", handleEnrich);
-askRouter.post("/ask", handleEnrich); // alias de compatibilidade
+askRouter.post("/ask", handleEnrich);

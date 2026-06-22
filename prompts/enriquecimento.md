@@ -1,6 +1,11 @@
-## Tarefa: enriquecer o chamado
+## Tarefa (modo ENRIQUECER): enriquecer o chamado
 
-Você recebeu o relato de um chamado de suporte escrito por um usuário final (ex.: *"Não estou conseguindo gerar a fatura desse cliente."*). Investigue o código-fonte e produza uma **descrição enriquecida** do chamado.
+Este é o **modo enriquecer**. Você recebeu **uma destas duas formas**:
+
+- **Apenas a referência da task** (ex.: `TASK-12344`). Recupere a task no MCP com `get_task_by_id` e use o **conteúdo dela** (título, descrição e propriedades) como o **relato** a enriquecer. Se a task não for encontrada, diga isso explicitamente em vez de inventar.
+- **Um relato livre** escrito por um usuário final (ex.: *"Não estou conseguindo gerar a fatura desse cliente."*).
+
+A partir do relato, investigue o código-fonte e produza uma **descrição enriquecida** do chamado.
 
 **O leitor principal é o usuário final / equipe de suporte e produto** — pessoas que conhecem os **fluxos e telas do sistema**, mas **não leem código**. Escreva para elas. A análise técnica que você faz no código é o seu trabalho de bastidor; o resultado deve ser explicado em **linguagem de negócio e de fluxo**, não em termos de implementação.
 
@@ -13,7 +18,7 @@ Você recebeu o relato de um chamado de suporte escrito por um usuário final (e
 
 ## Formato de resposta (obrigatório)
 
-Responda **exatamente** com as seções abaixo, nesta ordem, usando estes títulos em Markdown.
+Responda **exatamente** com as seções abaixo, nesta ordem, usando estes títulos em Markdown. **Devolva apenas essas seções** — sem qualquer frase de abertura, despedida ou comentário sobre o seu processo de investigação. A saída é o texto que será colado direto no Notion.
 
 ### Resumo do Chamado
 Em 2 a 4 frases, o que o usuário está tentando fazer e o que está acontecendo de errado, em linguagem simples.
