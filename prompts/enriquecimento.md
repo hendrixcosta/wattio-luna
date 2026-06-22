@@ -58,6 +58,15 @@ Bloco curto e objetivo, **somente o essencial** para o dev começar a investigar
 
 Se um item não tiver respaldo no código que você leu, omita-o em vez de inventar.
 
+---
+
+**📎 Fontes Consultadas**
+Uma linha curta deixando **explícito** o que você conseguiu ler do chamado, para a equipe saber o que já foi considerado. Indique:
+- **Comentários:** quantos havia e se você os leu (ex.: "Li os 3 comentários do chamado"; ou "O chamado não tem comentários").
+- **Anexos:** quantos havia e se você conseguiu abri-los/analisá-los (ex.: "Abri e analisei os 2 prints anexados"; ou "Havia 1 anexo, mas o link estava expirado e não consegui abri-lo"; ou "O chamado não tem anexos").
+
+Seja honesto: se algo não foi possível ler (link expirado, anexo que não abriu, comentário inacessível), diga isso aqui em vez de omitir.
+
 ## Lembretes
 
 - A investigação no código é obrigatória — toda afirmação se apoia no que você realmente leu. Mas **a parte técnica fica restrita ao apêndice "Notas Técnicas"**; o resto é funcional.

@@ -138,9 +138,9 @@ export async function runEnrichmentStream({ input, forceMode, question: explicit
   const systemPrompt = await buildSystemPrompt({ mode });
   const userPrompt = buildUserPrompt({ ticket, mode, taskId, question });
 
-  const { text, raw, durationMs } = await streamClaude({ systemPrompt, userPrompt, requestId, onEvent });
+  const { text, raw, durationMs, contextAccess } = await streamClaude({ systemPrompt, userPrompt, requestId, onEvent });
 
-  logger.info({ requestId, mode, durationMs, costUsd: raw?.total_cost_usd }, "Solicitação concluída (stream).");
+  logger.info({ requestId, mode, durationMs, costUsd: raw?.total_cost_usd, contextAccess }, "Solicitação concluída (stream).");
 
   return {
     requestId,
@@ -154,6 +154,9 @@ export async function runEnrichmentStream({ input, forceMode, question: explicit
       durationMs,
       numTurns: raw?.num_turns,
       costUsd: raw?.total_cost_usd,
+      // Resumo de acesso a comentários/anexos da tarefa, para a home exibir um
+      // selo claro de "conseguiu enriquecer com esse contexto" (ou não).
+      contextAccess,
     },
   };
 }

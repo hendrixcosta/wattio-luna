@@ -89,11 +89,18 @@ export const config = {
   mcpPostgresName: optional("MCP_POSTGRES_NAME", "postgres"),
 
   // Limites de execução do Claude
-  claudeTimeoutMs: Number(optional("CLAUDE_TIMEOUT_MS", "180000")), // 3 min
+  // Teto de 5 min: rede de segurança para o caso raro de um chamado pesado. O
+  // streaming já manda heartbeats (anti-timeout de proxy/cliente), então este é
+  // o único limite que realmente encerra o processo. A redução de payload do MCP
+  // e o corte de turnos abaixo é que mantêm o tempo real bem abaixo deste teto.
+  claudeTimeoutMs: Number(optional("CLAUDE_TIMEOUT_MS", "300000")), // 5 min
   // Tamanho máximo do relato do chamado. Aceita MAX_TICKET_LENGTH (preferencial)
   // ou MAX_QUESTION_LENGTH (legado) para compatibilidade.
   maxTicketLength: Number(optional("MAX_TICKET_LENGTH", optional("MAX_QUESTION_LENGTH", "4000"))),
-  maxTurns: Number(optional("CLAUDE_MAX_TURNS", "30")),
+  // Guardrail contra loops longos. A ordem de investigação cabe com folga em ~20
+  // turnos; 30 só dava espaço para o agente "passear". Cada turno é uma chamada
+  // de LLM sobre o contexto acumulado, então menos turnos = menos tempo de parede.
+  maxTurns: Number(optional("CLAUDE_MAX_TURNS", "20")),
 };
 
 export function assertConfig() {

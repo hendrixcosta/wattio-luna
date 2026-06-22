@@ -61,6 +61,7 @@
     .msg.luna .avatar { background: linear-gradient(135deg, var(--accent), #6d5ce0); }
     .bubble { flex: 1; min-width: 0; }
     .role { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .role .time { color: var(--muted); opacity: .65; font-variant-numeric: tabular-nums; margin-left: 6px; }
     .msg.user .content {
       background: var(--user); border: 1px solid var(--border);
       padding: 10px 14px; border-radius: var(--radius); border-top-left-radius: 4px;
@@ -112,6 +113,15 @@
     .answer .cursor { display: inline-block; width: 7px; height: 15px; background: var(--accent);
       vertical-align: -2px; animation: blink 1s steps(2) infinite; }
     @keyframes blink { 0%,50% { opacity: 1 } 50.01%,100% { opacity: 0 } }
+    /* Selos de contexto: deixam claro se a Luna acessou comentários/anexos da tarefa */
+    .ctxbadges { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+    .ctxbadges .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; padding: 4px 10px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+    }
+    .ctxbadges .badge.ok { border-color: rgba(74,222,128,.45); color: var(--ok); background: rgba(74,222,128,.08); }
+    .ctxbadges .badge.none { border-color: var(--border); color: var(--muted); }
     .meta { font-size: 11.5px; color: var(--muted); margin-top: 10px; }
     .errbox { color: var(--err); border: 1px solid #5b2330; background: #2a161b; padding: 10px 13px; border-radius: 10px; }
 
@@ -255,14 +265,20 @@
     }
 
     // ---------- Construção das mensagens ----------
+    // Hora atual no formato HH:MM, para carimbar cada mensagem.
+    function nowTime() {
+      return new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    }
+
     function addUser(text) {
       empty?.remove();
       const el = document.createElement("div");
       el.className = "msg user";
-      el.innerHTML = `<div class="avatar">🧑</div><div class="bubble"><div class="role">Você</div><div class="content"></div></div>`;
+      el.innerHTML = `<div class="avatar">🧑</div><div class="bubble"><div class="role">Você <span class="time">${nowTime()}</span></div><div class="content"></div></div>`;
       el.querySelector(".content").textContent = text;
       feed.appendChild(el);
-      scroll();
+      stick = true;
+      scroll(true);
     }
 
     function addLuna() {
@@ -272,11 +288,12 @@
       el.innerHTML = `
         <div class="avatar">🌙</div>
         <div class="bubble">
-          <div class="role">Luna</div>
+          <div class="role">Luna <span class="time">${nowTime()}</span></div>
           <details class="steps" open>
             <summary><span class="spinner"></span><span class="now">Iniciando…</span></summary>
             <ul></ul>
           </details>
+          <div class="ctxbadges" style="display:none"></div>
           <div class="answer"></div>
           <div class="meta" style="display:none"></div>
         </div>`;
@@ -286,12 +303,47 @@
         steps: el.querySelector(".steps"),
         now: el.querySelector(".now"),
         list: el.querySelector(".steps ul"),
+        badges: el.querySelector(".ctxbadges"),
         answer: el.querySelector(".answer"),
         meta: el.querySelector(".meta"),
       };
     }
 
-    function scroll() { $("#main").scrollTop = $("#main").scrollHeight; }
+    // Monta os selos de contexto (comentários/anexos) a partir do meta do `done`.
+    // Só aparecem quando a Luna chegou a consultar esses índices (ou seja, quando
+    // havia uma tarefa associada ao chamado).
+    function renderContextBadges(el, access) {
+      if (!access) return;
+      const badge = (icon, label, info) => {
+        if (!info || !info.queried) return "";
+        const found = Number(info.found) || 0;
+        const cls = found > 0 ? "ok" : "none";
+        const txt = found > 0
+          ? `${found} ${label}${found === 1 ? "" : "s"}`
+          : `sem ${label}s indexados`;
+        return `<span class="badge ${cls}">${icon} ${txt}</span>`;
+      };
+      const html = badge("💬", "comentário", access.comments) + badge("📎", "anexo", access.attachments);
+      if (!html) return;
+      el.innerHTML = html;
+      el.style.display = "flex";
+    }
+
+    // Auto-scroll "grudento": só acompanha o fim se o usuário já estiver no fim.
+    // Assim ele pode rolar para cima e ler enquanto o servidor ainda responde.
+    let stick = true;
+    (function () {
+      const main = $("#main");
+      main.addEventListener("scroll", () => {
+        const dist = main.scrollHeight - main.scrollTop - main.clientHeight;
+        stick = dist < 80;
+      }, { passive: true });
+    })();
+    function scroll(force) {
+      if (!force && !stick) return;
+      const main = $("#main");
+      main.scrollTop = main.scrollHeight;
+    }
 
     let busy = false;
     function setBusy(b) { busy = b; sendBtn.disabled = b; sendBtn.textContent = b ? "Analisando…" : "Enriquecer"; }
@@ -364,6 +416,7 @@
             ui.now.innerHTML = `<span class="check">✓</span> Concluído`;
             ui.answer.innerHTML = renderMarkdown(answerText);
             const m = evt.meta || {};
+            renderContextBadges(ui.badges, m.contextAccess);
             const secs = m.durationMs ? (m.durationMs / 1000).toFixed(1) + "s" : "";
             const cost = m.costUsd != null ? " · $" + Number(m.costUsd).toFixed(4) : "";
             ui.meta.style.display = "block";
