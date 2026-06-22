@@ -18,29 +18,43 @@ A partir do relato, investigue o código-fonte e produza uma **descrição enriq
 
 ## Formato de resposta (obrigatório)
 
-Responda **exatamente** com as seções abaixo, nesta ordem, usando estes títulos em Markdown. **Devolva apenas essas seções** — sem qualquer frase de abertura, despedida ou comentário sobre o seu processo de investigação. A saída é o texto que será colado direto no Notion.
+Responda **exatamente** com as seções abaixo, nesta ordem, usando estes títulos em Markdown (com o emoji/ícone indicado em cada um). **Devolva apenas essas seções** — sem qualquer frase de abertura, despedida ou comentário sobre o seu processo de investigação. A saída é o texto que será **colado direto no Notion**.
 
-### Resumo do Chamado
+### Formatação para o Notion (importante)
+
+A saída é colada no Notion, que **converte Markdown em blocos** automaticamente. Para que vire um bloco bem formatado, com títulos e ícones:
+
+- Use os títulos das seções **exatamente** como abaixo, em nível `##` (headings do Notion), **mantendo o emoji no início** — o emoji vira o ícone visual do título.
+- Use **listas** (`-` para itens, `1.` para passos numerados) para enumerações; o Notion as converte em listas reais.
+- Use **negrito** (`**texto**`) para destacar termos-chave (nomes de telas, campos, regras).
+- Separe a "Descrição Enriquecida" e as "Notas Técnicas" do restante com um **divisor** (`---`), que o Notion transforma numa linha divisória.
+- Para destacar uma observação importante, você pode usar uma **citação** (`> texto`), que o Notion converte em bloco de citação.
+- **Não** use blocos de código, tabelas ou HTML no corpo funcional; mantenha texto, listas e títulos simples. Caminhos de arquivo (só nas Notas Técnicas) podem usar `crase`.
+- Não envolva a resposta inteira em um bloco de código ou em aspas; devolva o Markdown "cru".
+
+## 📋 Resumo do Chamado
 Em 2 a 4 frases, o que o usuário está tentando fazer e o que está acontecendo de errado, em linguagem simples.
 
-### Como o Sistema Funciona Hoje
+## ⚙️ Como o Sistema Funciona Hoje
 Explique, em linguagem de fluxo, o que essa parte do sistema faz e para que serve — como se estivesse explicando para alguém que usa o sistema mas nunca viu o código.
 
-### Passo a Passo do Fluxo
+## 🔄 Passo a Passo do Fluxo
 Descreva, em etapas numeradas, o caminho que o usuário/sistema percorre nesse processo (ex.: 1. o usuário abre a tela X; 2. preenche os dados Y; 3. o sistema confere se Z; 4. gera o resultado). Foque no que é visível e compreensível para quem opera o sistema.
 
-### Regras que o Sistema Aplica
+## ✅ Regras que o Sistema Aplica
 Liste, em linguagem de negócio, as condições e validações que o sistema exige nesse fluxo (ex.: "o cliente precisa ter pelo menos um contrato ativo", "não é possível gerar duas faturas no mesmo mês"). Sem citar código.
 
-### Possíveis Causas
+## 🔍 Possíveis Causas
 Hipóteses, em linguagem acessível, do porquê do problema relatado (ex.: "provavelmente o cliente está sem contrato ativo, o que impede a geração"). Deixe claro que são hipóteses. Não exponha detalhes de implementação aqui — eles vão no apêndice técnico.
 
-### Descrição Enriquecida para o Notion
+---
+
+## 📝 Descrição Enriquecida para o Notion
 Texto final consolidado e fluido, pronto para colar no chamado do Notion. Reúne o contexto funcional suficiente para a equipe entender e direcionar o chamado, **sem depender das seções anteriores e sem linguagem técnica**.
 
 ---
 
-### Notas Técnicas (para o time de desenvolvimento)
+## 🛠️ Notas Técnicas (para o time de desenvolvimento)
 Bloco curto e objetivo, **somente o essencial** para o dev começar a investigar. Não é um inventário: cite apenas os poucos pontos de partida realmente relevantes. Use bullets enxutos, por exemplo:
 - **Onde olhar primeiro:** o(s) arquivo(s)/fluxo de código mais central(is) (caminho relativo).
 - **Pontos de atenção:** a validação, regra ou trecho específico que mais provavelmente explica o problema.
