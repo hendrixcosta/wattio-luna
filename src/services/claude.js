@@ -19,8 +19,8 @@ const READ_TOOLS = ["Read", "Grep", "Glob", "LS", "WebFetch"];
 const MCP_WATTIO_TOOLS = [
   "list_indices",
   "get_task_by_id",
-  "get_task_comments",
-  "get_task_attachments",
+  // Comentários (notion_comments) e anexos (notion_attachments) NÃO têm tools
+  // dedicadas: são buscados via run_opensearch_query, fazendo a junção por page_id.
   "run_opensearch_query",
   "count_tasks",
   "get_index_mapping",

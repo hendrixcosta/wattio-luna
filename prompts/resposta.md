@@ -7,7 +7,7 @@ Não é um enriquecimento: **não** produza as seções de enriquecimento. Respo
 ### Como investigar (orientado pela pergunta)
 
 1. **Recupere a task** com `get_task_by_id` para entender o **domínio** do chamado (o que ele trata, qual módulo/fluxo, qual cliente).
-2. **Leia os comentários** (`get_task_comments`) e **os anexos** (`get_task_attachments`) — leia `text` e o `raw` de cada comentário; abra cada `attachment_url` com `WebFetch` e analise o conteúdo (prints, erros, valores). É comum a resposta estar ali.
+2. **Leia os comentários e os anexos** — não há tools dedicadas; use `run_opensearch_query` nos índices `notion_comments` e `notion_attachments`, juntando por `page_id.keyword` (use o UUID da página do chamado e os demais UUIDs Notion que aparecem nele). Leia `text` e o `raw` de cada comentário; abra cada `attachment_url` com `WebFetch` e analise o conteúdo (prints, erros, valores). É comum a resposta estar ali.
 3. **Investigue o código** apenas no que for necessário para responder. Siga as referências (controller → service → model → job → integrações → tabelas) até ter base concreta para a resposta.
 4. Se a pergunta tiver mais de uma parte, responda a **cada** parte.
 
