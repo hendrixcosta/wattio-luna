@@ -6,10 +6,11 @@ Não é um enriquecimento: **não** produza as seções de enriquecimento. Respo
 
 ### Como investigar (orientado pela pergunta)
 
-1. **Recupere a task** com `get_task_by_id` para entender o **domínio** do chamado (o que ele trata, qual módulo/fluxo, qual cliente).
-2. **Leia os comentários e os anexos** — não há tools dedicadas; use `run_opensearch_query` nos índices `notion_comments` e `notion_attachments`, juntando por `page_id.keyword` (use o UUID da página do chamado e os demais UUIDs Notion que aparecem nele). Leia `text` e o `raw` de cada comentário; abra cada `attachment_url` com `WebFetch` e analise o conteúdo (prints, erros, valores). É comum a resposta estar ali.
+1. **Recupere a task** para entender o **domínio** do chamado (o que ele trata, qual módulo/fluxo, qual cliente).
+2. **Leia os comentários e os anexos** do chamado: leia o texto e o conteúdo completo de cada comentário (reprodução, mensagens de erro, contexto) e abra cada anexo com `WebFetch` para **analisar o conteúdo** (prints, erros, valores). É comum a resposta estar ali. Os links de anexo são assinados e expiram — carregue-os logo; se algum não abrir, **diga isso explicitamente** em vez de supor.
 3. **Investigue o código** apenas no que for necessário para responder. Siga as referências (controller → service → model → job → integrações → tabelas) até ter base concreta para a resposta.
-4. Se a pergunta tiver mais de uma parte, responda a **cada** parte.
+4. **Verifique no banco de dados, quando disponível e útil para a pergunta.** Se a resposta depender do estado real de um registro (ex.: "esse cliente está com contrato ativo?", "qual o status da fatura X?"), inspecione o schema e rode um `SELECT` (somente leitura) filtrando pelo identificador citado. Responda com base no dado real, não em suposição.
+5. Se a pergunta tiver mais de uma parte, responda a **cada** parte.
 
 ### Como responder (linguagem)
 

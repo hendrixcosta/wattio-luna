@@ -27,12 +27,16 @@ services:
       # --- MCP: wattio-mcp (OpenSearch de tarefas operacionais) ---
       # Aponta para o serviço wattio-mcp na rede do compose. Vazio = MCP desligado.
       MCP_WATTIO_URL: ${MCP_WATTIO_URL:-http://wattio-mcp:8000/mcp}
+      # --- MCP: postgres (banco de produção, somente leitura) ---
+      # Aponta para o serviço postgres-mcp na rede do compose. Vazio = MCP desligado.
+      MCP_POSTGRES_URL: ${MCP_POSTGRES_URL:-http://postgres-mcp:8000/sse}
       # --- Limites ---
       CLAUDE_TIMEOUT_MS: ${CLAUDE_TIMEOUT_MS:-180000}
       CLAUDE_MAX_TURNS: ${CLAUDE_MAX_TURNS:-30}
       MAX_TICKET_LENGTH: ${MAX_TICKET_LENGTH:-4000}
     depends_on:
       - wattio-mcp
+      - postgres-mcp
     # Volume persistente para o repositório clonado (sobrevive a restarts).
     volumes:
       - luna_repo:/app/repo
@@ -80,6 +84,35 @@ services:
       OPENSEARCH_VERIFY_CERTS: ${OPENSEARCH_VERIFY_CERTS:-true}
       OPENSEARCH_USE_AWS_AUTH: ${OPENSEARCH_USE_AWS_AUTH:-false}
       AWS_REGION: ${AWS_REGION:-us-east-2}
+    # Não exposto ao host: acessível apenas pela rede interna do compose.
+    expose:
+      - "8000"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); sys.exit(0 if s.connect_ex(('127.0.0.1',8000))==0 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # MCP server: expõe o banco de produção PostgreSQL em modo RESTRITO (somente
+  # leitura) via SSE. A Luna conecta nele em http://postgres-mcp:8000/sse para
+  # inspecionar o schema e consultar o registro concreto do caso relatado.
+  # A DATABASE_URI fica só aqui — a Luna nunca recebe a credencial do banco.
+  postgres-mcp:
+    image: crystaldba/postgres-mcp:latest
+    container_name: postgres-mcp
+    restart: unless-stopped
+    environment:
+      # String de conexão de LEITURA para o banco de produção (preencha no .env).
+      DATABASE_URI: ${DATABASE_URI}
+    # --access-mode=restricted garante somente leitura (bloqueia INSERT/UPDATE/DDL).
+    command:
+      - "--access-mode=restricted"
+      - "--transport=sse"
+      - "--sse-host=0.0.0.0"
+      - "--sse-port=8000"
     # Não exposto ao host: acessível apenas pela rede interna do compose.
     expose:
       - "8000"

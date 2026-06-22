@@ -78,6 +78,16 @@ export const config = {
   // Nome lógico do servidor MCP -> prefixo das ferramentas: mcp__wattio__<tool>.
   mcpWattioName: optional("MCP_WATTIO_NAME", "wattio"),
 
+  // --- MCP: postgres (banco de dados de produção, somente leitura) ---
+  // URL do servidor `postgres-mcp` (transporte SSE), rodando como serviço próprio
+  // no compose — assim a Luna não precisa de uv/Python nem rootfs gravável. O
+  // servidor abre o banco em modo restrito (somente leitura) e a Luna o usa para
+  // inspecionar o schema e consultar exatamente o caso relatado no chamado.
+  // Vazio = MCP postgres desabilitado (a Luna analisa só código + chamados).
+  mcpPostgresUrl: optional("MCP_POSTGRES_URL", ""),
+  // Nome lógico do servidor MCP -> prefixo das ferramentas: mcp__postgres__<tool>.
+  mcpPostgresName: optional("MCP_POSTGRES_NAME", "postgres"),
+
   // Limites de execução do Claude
   claudeTimeoutMs: Number(optional("CLAUDE_TIMEOUT_MS", "180000")), // 3 min
   // Tamanho máximo do relato do chamado. Aceita MAX_TICKET_LENGTH (preferencial)

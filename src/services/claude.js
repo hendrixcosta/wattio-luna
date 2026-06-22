@@ -26,27 +26,52 @@ const MCP_WATTIO_TOOLS = [
   "get_index_mapping",
 ];
 
-/** Monta a lista de ferramentas permitidas conforme o MCP esteja ou não ativo. */
+/**
+ * Ferramentas do MCP postgres (banco de produção, somente leitura), liberadas só
+ * quando DATABASE_URI está configurada. Servem para a Luna inspecionar o schema
+ * e consultar dados reais que comprovem/contextualizem o caso relatado no chamado.
+ * Em --access-mode=restricted o execute_sql só roda SELECT/consultas de leitura.
+ */
+const MCP_POSTGRES_TOOLS = [
+  "list_schemas", // lista os schemas do banco
+  "list_objects", // lista tabelas/views de um schema
+  "get_object_details", // colunas, tipos, chaves e índices de uma tabela
+  "execute_sql", // consultas de LEITURA (somente SELECT no modo restricted)
+  "explain_query", // plano de execução (sem rodar a query)
+];
+
+/** Monta a lista de ferramentas permitidas conforme os MCPs estejam ou não ativos. */
 function buildAllowedTools() {
   const tools = [...READ_TOOLS];
   if (config.mcpWattioUrl) {
     const ns = `mcp__${config.mcpWattioName}`;
     tools.push(ns, ...MCP_WATTIO_TOOLS.map((t) => `${ns}__${t}`));
   }
+  if (config.mcpPostgresUrl) {
+    const ns = `mcp__${config.mcpPostgresName}`;
+    tools.push(...MCP_POSTGRES_TOOLS.map((t) => `${ns}__${t}`));
+  }
   return tools.join(",");
 }
 
 /**
- * Config do MCP (transporte HTTP / streamable-http) passada ao Claude Code via
- * `--mcp-config`. Retorna null quando o MCP está desabilitado.
+ * Config dos MCPs passada ao Claude Code via `--mcp-config`. Retorna null quando
+ * nenhum MCP está habilitado. Pode conter dois servidores, ambos via rede:
+ *  - wattio   (transporte HTTP / streamable-http): chamados/tarefas no OpenSearch.
+ *  - postgres (transporte SSE): banco de produção, somente leitura. Roda como
+ *    serviço próprio no compose (postgres-mcp --access-mode=restricted); a Luna
+ *    apenas conecta na URL, sem precisar de uv/Python nem rootfs gravável.
  */
 function buildMcpConfig() {
-  if (!config.mcpWattioUrl) return null;
-  return JSON.stringify({
-    mcpServers: {
-      [config.mcpWattioName]: { type: "http", url: config.mcpWattioUrl },
-    },
-  });
+  const mcpServers = {};
+  if (config.mcpWattioUrl) {
+    mcpServers[config.mcpWattioName] = { type: "http", url: config.mcpWattioUrl };
+  }
+  if (config.mcpPostgresUrl) {
+    mcpServers[config.mcpPostgresName] = { type: "sse", url: config.mcpPostgresUrl };
+  }
+  if (Object.keys(mcpServers).length === 0) return null;
+  return JSON.stringify({ mcpServers });
 }
 
 /**
@@ -182,6 +207,10 @@ function describeTool(name, input = {}) {
     case "WebFetch":
       return { icon: "🌐", label: `Abrindo link do chamado ${shorten(input.url, 60)}` };
     default:
+      if (name.startsWith(`mcp__${config.mcpPostgresName}__`)) {
+        const tool = name.split("__").pop();
+        return { icon: "🗄️", label: `Analisando o banco de dados: ${tool}` };
+      }
       if (name.startsWith("mcp__")) {
         const tool = name.split("__").pop();
         return { icon: "🧰", label: `Consultando tarefas (OpenSearch): ${tool}` };

@@ -5,14 +5,15 @@
       "Grep",
       "Glob",
       "LS",
-      "mcp__wattio"
+      "WebFetch",
+      "mcp__wattio",
+      "mcp__postgres"
     ],
     "deny": [
       "Bash",
       "Write",
       "Edit",
       "NotebookEdit",
-      "WebFetch",
       "WebSearch",
       "Task"
     ],

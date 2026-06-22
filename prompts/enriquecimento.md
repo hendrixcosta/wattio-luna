@@ -2,12 +2,12 @@
 
 Este é o **modo enriquecer**. Você recebeu **uma destas duas formas**:
 
-- **Apenas a referência da task** (ex.: `TASK-12344`). Recupere a task no MCP com `get_task_by_id` e use o **conteúdo dela** (título, descrição e propriedades) como o **relato** a enriquecer. Se a task não for encontrada, diga isso explicitamente em vez de inventar.
+- **Apenas a referência da task** (ex.: `TASK-12344`). Recupere a task no MCP de chamados e use o **conteúdo dela** (título, descrição e propriedades) como o **relato** a enriquecer. Se a task não for encontrada, diga isso explicitamente em vez de inventar.
 - **Um relato livre** escrito por um usuário final (ex.: *"Não estou conseguindo gerar a fatura desse cliente."*).
 
-A partir do relato, investigue o código-fonte e produza uma **descrição enriquecida** do chamado.
+### Antes de enriquecer: levante todo o contexto do chamado
 
-**O leitor principal é o usuário final / equipe de suporte e produto** — pessoas que conhecem os **fluxos e telas do sistema**, mas **não leem código**. Escreva para elas. A análise técnica que você faz no código é o seu trabalho de bastidor; o resultado deve ser explicado em **linguagem de negócio e de fluxo**, não em termos de implementação.
+Siga a **ordem de investigação definida no system prompt** (recuperar o chamado → comentários → anexos → estabelecer o problema → investigar o código e, quando disponível, o banco). **Não pare no conteúdo da task**: o que enriquece o chamado costuma estar nos comentários e anexos. Só depois de consolidar **relato + comentários + anexos** numa descrição precisa do problema é que você investiga o código e produz a **descrição enriquecida**.
 
 ### Como escrever (linguagem)
 
@@ -18,7 +18,7 @@ A partir do relato, investigue o código-fonte e produza uma **descrição enriq
 
 ## Formato de resposta (obrigatório)
 
-Responda **exatamente** com as seções abaixo, nesta ordem, usando estes títulos em Markdown (com o emoji/ícone indicado em cada um). **Devolva apenas essas seções** — sem qualquer frase de abertura, despedida ou comentário sobre o seu processo de investigação. A saída é o texto que será **colado direto no Notion**.
+Responda com as seções abaixo, **nesta ordem**, usando estes títulos em Markdown (com o emoji/ícone indicado em cada um). A seção **✅ Regras que o Sistema Aplica** pode ser **omitida** quando o fluxo não tiver validações/condições relevantes a listar — não a preencha por preencher. As demais são obrigatórias. **Devolva apenas essas seções** — sem qualquer frase de abertura, despedida ou comentário sobre o seu processo de investigação. A saída é o texto que será **colado direto no Notion**.
 
 ### Formatação para o Notion (importante)
 
@@ -36,16 +36,13 @@ A saída é colada no Notion, que **converte Markdown em blocos** automaticament
 Em 2 a 4 frases, o que o usuário está tentando fazer e o que está acontecendo de errado, em linguagem simples.
 
 **⚙️ Como o Sistema Funciona Hoje**
-Explique, em linguagem de fluxo, o que essa parte do sistema faz e para que serve — como se estivesse explicando para alguém que usa o sistema mas nunca viu o código.
-
-**🔄 Passo a Passo do Fluxo**
-Descreva, em etapas numeradas, o caminho que o usuário/sistema percorre nesse processo (ex.: 1. o usuário abre a tela X; 2. preenche os dados Y; 3. o sistema confere se Z; 4. gera o resultado). Foque no que é visível e compreensível para quem opera o sistema.
+Comece com 1 a 2 frases explicando, em linguagem de fluxo, **o que essa parte do sistema faz e para que serve** — como se explicasse para alguém que usa o sistema mas nunca viu o código. Em seguida, descreva em **etapas numeradas** o caminho que o usuário/sistema percorre nesse processo (ex.: 1. o usuário abre a tela X; 2. preenche os dados Y; 3. o sistema confere se Z; 4. gera o resultado). Foque no que é visível e compreensível para quem opera o sistema.
 
 **✅ Regras que o Sistema Aplica**
 Liste, em linguagem de negócio, as condições e validações que o sistema exige nesse fluxo (ex.: "o cliente precisa ter pelo menos um contrato ativo", "não é possível gerar duas faturas no mesmo mês"). Sem citar código.
 
 **🔍 Possíveis Causas**
-Hipóteses, em linguagem acessível, do porquê do problema relatado (ex.: "provavelmente o cliente está sem contrato ativo, o que impede a geração"). Deixe claro que são hipóteses. Não exponha detalhes de implementação aqui — eles vão no apêndice técnico.
+Hipóteses, em linguagem acessível, do porquê do problema relatado (ex.: "provavelmente o cliente está sem contrato ativo, o que impede a geração"). Deixe claro que são hipóteses. **Quando o MCP de banco de dados estiver disponível, confirme a hipótese olhando o registro concreto do caso** (SELECT filtrando pelo cliente/contrato/fatura citado): se o dado real comprovar a causa, diga isso com segurança (ex.: "ao consultar o cadastro, o contrato do cliente está **inativo**, o que explica a falha") e deixe de tratar como mera hipótese. Não exponha detalhes de implementação aqui — eles vão no apêndice técnico.
 
 ---
 
@@ -64,5 +61,6 @@ Se um item não tiver respaldo no código que você leu, omita-o em vez de inven
 ## Lembretes
 
 - A investigação no código é obrigatória — toda afirmação se apoia no que você realmente leu. Mas **a parte técnica fica restrita ao apêndice "Notas Técnicas"**; o resto é funcional.
+- Quando o **MCP de banco de dados** estiver disponível, prefira **verificar o caso concreto** (o registro real do cliente/contrato/fatura citado) em vez de só teorizar a partir do código. O achado do banco entra no corpo em **linguagem de negócio**; nomes de tabela/coluna ficam só nas Notas Técnicas. Somente leitura — jamais escreva no banco.
 - Se uma seção não tiver respaldo no código, declare isso explicitamente em vez de inventar.
 - Você está enriquecendo o chamado, não resolvendo-o: não proponha correções de código nem altere arquivos.
