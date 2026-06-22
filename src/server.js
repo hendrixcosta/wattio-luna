@@ -6,6 +6,7 @@ import { config, assertConfig } from "./config.js";
 import { logger } from "./utils/logger.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { askRouter } from "./routes/ask.js";
+import { enrichRouter } from "./routes/enrich.js";
 import { chatRouter } from "./routes/chat.js";
 import { ensureRepo } from "./services/repo.js";
 
@@ -35,6 +36,7 @@ app.use(express.static(publicDir));
 // Tudo abaixo exige autenticação.
 app.use(authMiddleware);
 app.use("/", askRouter);
+app.use("/", enrichRouter);
 app.use("/", chatRouter);
 
 // Handler de erro genérico (ex.: JSON malformado).

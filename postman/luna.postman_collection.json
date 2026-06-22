@@ -2,7 +2,7 @@
   "info": {
     "name": "Wattio Luna API",
     "_postman_id": "a1b2c3d4-luna-0000-0000-wattioluna01",
-    "description": "Coleção de testes das rotas da Luna — agente de IA que enriquece chamados de suporte analisando o código-fonte do repositório local com Claude Code.\n\n## Variáveis (na aba Variables da coleção)\n- `host`     → base da API. Ex.: `http://localhost:8080` (local) ou `https://luna.wattio.com.br` (produção).\n- `apiKey`   → uma das chaves definidas em `LUNA_API_KEYS`. Enviada como `Authorization: Bearer {{apiKey}}`.\n- `ticket`   → texto do chamado usado nas requisições de enriquecimento.\n\nA autenticação por Bearer está configurada no nível da coleção; todas as rotas a herdam, exceto `GET /health` (auth: No Auth).",
+    "description": "Coleção de testes das rotas da Luna — agente de IA que enriquece chamados de suporte e responde perguntas sobre tasks, analisando o código-fonte do repositório local com Claude Code.\n\n## Rotas\n- `GET  /health`       → healthcheck público (sem autenticação).\n- `POST /enrich`       → ENRIQUECE o chamado (síncrona). Body: `{ \"ticket\": \"...\" }`.\n- `POST /ask`          → RESPONDE uma pergunta sobre uma task (síncrona). Body: `{ \"ticket\": \"TASK-123\", \"question\": \"...\" }`.\n- `POST /chat/stream`  → streaming NDJSON para a interface de chat.\n\n## Variáveis (na aba Variables da coleção)\n- `host`     → base da API. Ex.: `http://localhost:8080` (local) ou `https://luna.wattio.com.br` (produção).\n- `apiKey`   → uma das chaves definidas em `LUNA_API_KEYS`. Enviada como `Authorization: Bearer {{apiKey}}`.\n- `ticket`   → texto/relato do chamado usado nas requisições de enriquecimento.\n- `taskRef`  → referência da task (ex.: `TASK-12344`) usada na rota de pergunta e resposta.\n- `question` → pergunta sobre a task usada na rota `/ask`.\n\nA autenticação por Bearer está configurada no nível da coleção; todas as rotas a herdam, exceto `GET /health` (auth: No Auth).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -29,11 +29,23 @@
       "value": "Não estou conseguindo gerar a fatura desse cliente.",
       "type": "string",
       "description": "Texto do chamado de suporte a ser enriquecido."
+    },
+    {
+      "key": "taskRef",
+      "value": "TASK-12344",
+      "type": "string",
+      "description": "Referência da task usada na rota /ask."
+    },
+    {
+      "key": "question",
+      "value": "qual permissão está atrelada hoje?",
+      "type": "string",
+      "description": "Pergunta sobre a task usada na rota /ask."
     }
   ],
   "item": [
     {
-      "name": "Health",
+      "name": "Health (GET /health)",
       "request": {
         "auth": { "type": "noauth" },
         "method": "GET",
@@ -52,6 +64,7 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));",
               "pm.test('agent é luna', () => pm.expect(pm.response.json().agent).to.eql('luna'));"
             ]
           }
@@ -59,7 +72,7 @@
       ]
     },
     {
-      "name": "Ask — enriquecer (POST /ask)",
+      "name": "Enrich — enriquecer (POST /enrich)",
       "request": {
         "method": "POST",
         "header": [
@@ -70,11 +83,11 @@
           "raw": "{\n  \"ticket\": \"{{ticket}}\"\n}"
         },
         "url": {
-          "raw": "{{host}}/ask",
+          "raw": "{{host}}/enrich",
           "host": ["{{host}}"],
-          "path": ["ask"]
+          "path": ["enrich"]
         },
-        "description": "Rota ÚNICA e SÍNCRONA — a conexão fica aberta durante toda a execução do Claude Code (pode levar minutos). Quando o relato traz só a referência da task (ex.: `TASK-12344`) ou um relato livre, a Luna ENRIQUECE o chamado. Header de auth herdado da coleção. Aceita também o campo legado `message`."
+        "description": "Rota SÍNCRONA de ENRIQUECIMENTO — a conexão fica aberta durante toda a execução do Claude Code (pode levar minutos). Aceita a referência da task (ex.: `TASK-12344`) ou um relato livre no campo `ticket`. A Luna investiga o código e devolve a descrição enriquecida pronta para o Notion. Header de auth herdado da coleção. Aceita também o campo legado `message`.\n\nResposta: `{ requestId, repo, ticket, mode: \"enrich\", taskId, enrichment, meta }`."
       },
       "event": [
         {
@@ -82,7 +95,9 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('status 200', () => pm.response.to.have.status(200));"
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('modo enrich', () => pm.expect(pm.response.json().mode).to.eql('enrich'));",
+              "pm.test('tem enrichment', () => pm.expect(pm.response.json().enrichment).to.be.a('string').and.not.empty);"
             ]
           }
         }
@@ -97,14 +112,14 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"ticket\": \"task 12344 - qual permissão está atrelada hoje?\"\n}"
+          "raw": "{\n  \"ticket\": \"{{taskRef}}\",\n  \"question\": \"{{question}}\"\n}"
         },
         "url": {
           "raw": "{{host}}/ask",
           "host": ["{{host}}"],
           "path": ["ask"]
         },
-        "description": "Mesma rota /ask. Quando o relato traz uma referência de task SEGUIDA de uma pergunta, a Luna NÃO enriquece — ela responde objetivamente apenas a pergunta sobre a task."
+        "description": "Rota SÍNCRONA de PERGUNTA E RESPOSTA. Informe a referência da task em `ticket` e a pergunta em `question` (ou combine no relato: `task 12344 - qual permissão...`). A Luna NÃO enriquece — responde objetivamente apenas a pergunta sobre a task. Exige tanto a referência da task quanto a pergunta (senão responde 400).\n\nResposta: `{ requestId, repo, ticket, mode: \"answer\", taskId, enrichment, meta }`."
       },
       "event": [
         {
@@ -112,7 +127,39 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('status 200', () => pm.response.to.have.status(200));"
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('modo answer', () => pm.expect(pm.response.json().mode).to.eql('answer'));",
+              "pm.test('tem resposta', () => pm.expect(pm.response.json().enrichment).to.be.a('string').and.not.empty);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ask — sem question (400 esperado)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ticket\": \"{{taskRef}}\"\n}"
+        },
+        "url": {
+          "raw": "{{host}}/ask",
+          "host": ["{{host}}"],
+          "path": ["ask"]
+        },
+        "description": "Teste negativo: no modo de resposta o campo `question` é obrigatório — sem ele a API responde 400."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 400', () => pm.response.to.have.status(400));"
             ]
           }
         }
@@ -134,7 +181,7 @@
           "host": ["{{host}}"],
           "path": ["chat", "stream"]
         },
-        "description": "Streaming NDJSON (application/x-ndjson): uma linha JSON por evento.\nEventos: `status` (passo em andamento), `delta` (pedaço da resposta), `done` (fim + metadados), `error` (falha), `ping` (heartbeat).\n\nObservação: o Postman exibe a resposta NDJSON completa ao final; o efeito de tempo real é melhor observado em `curl` ou na UI de chat (`/`)."
+        "description": "Streaming NDJSON (application/x-ndjson): uma linha JSON por evento.\nEventos: `status` (passo em andamento), `delta` (pedaço da resposta), `done` (fim + metadados), `error` (falha), `ping` (heartbeat).\n\nO modo (enrich/answer) é inferido do conteúdo do relato (parseTicket), pois esta rota não força modo.\n\nObservação: o Postman exibe a resposta NDJSON completa ao final; o efeito de tempo real é melhor observado em `curl` ou na UI de chat (`/`)."
       },
       "event": [
         {
@@ -162,9 +209,9 @@
           "raw": "{\n  \"ticket\": \"{{ticket}}\"\n}"
         },
         "url": {
-          "raw": "{{host}}/ask",
+          "raw": "{{host}}/enrich",
           "host": ["{{host}}"],
-          "path": ["ask"]
+          "path": ["enrich"]
         },
         "description": "Teste negativo: sem Authorization a API deve responder 401."
       },
@@ -196,9 +243,9 @@
           "raw": "{\n  \"ticket\": \"{{ticket}}\"\n}"
         },
         "url": {
-          "raw": "{{host}}/ask",
+          "raw": "{{host}}/enrich",
           "host": ["{{host}}"],
-          "path": ["ask"]
+          "path": ["enrich"]
         },
         "description": "Teste negativo: com chave inválida a API deve responder 403."
       },
