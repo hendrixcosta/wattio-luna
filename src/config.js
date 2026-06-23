@@ -89,11 +89,11 @@ export const config = {
   mcpPostgresName: optional("MCP_POSTGRES_NAME", "postgres"),
 
   // Limites de execução do Claude
-  // Teto de 5 min: rede de segurança para o caso raro de um chamado pesado. O
+  // Teto de 10 min: rede de segurança para o caso raro de um chamado pesado. O
   // streaming já manda heartbeats (anti-timeout de proxy/cliente), então este é
   // o único limite que realmente encerra o processo. A redução de payload do MCP
   // e o corte de turnos abaixo é que mantêm o tempo real bem abaixo deste teto.
-  claudeTimeoutMs: Number(optional("CLAUDE_TIMEOUT_MS", "300000")), // 5 min
+  claudeTimeoutMs: Number(optional("CLAUDE_TIMEOUT_MS", "600000")), // 10 min
   // Tamanho máximo do relato do chamado. Aceita MAX_TICKET_LENGTH (preferencial)
   // ou MAX_QUESTION_LENGTH (legado) para compatibilidade.
   maxTicketLength: Number(optional("MAX_TICKET_LENGTH", optional("MAX_QUESTION_LENGTH", "4000"))),
